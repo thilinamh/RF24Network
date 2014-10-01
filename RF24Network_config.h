@@ -10,13 +10,19 @@
 #ifndef __RF24_CONFIG_H__
 #define __RF24_CONFIG_H__
 
-#if ARDUINO < 100
-#include <WProgram.h>
-#else
-#include <Arduino.h>
+#include <stddef.h>
+
+#if defined (linux) || defined (__linux)
+  #define RF24_LINUX
 #endif
 
-#include <stddef.h>
+#if ARDUINO
+  #if ARDUINO < 100 
+    #include <WProgram.h>
+  #else
+    #include <Arduino.h>
+  #endif
+#endif
 
 /********** USER CONFIG **************/
 
@@ -38,7 +44,7 @@
   #include <string.h>
 
 
- #if defined(__arm__) || defined (CORE_TEENSY)
+ #if (defined(__arm__) || defined (CORE_TEENSY)) && !defined RF24_LINUX
    #include <SPI.h>
  #endif
 
@@ -80,7 +86,7 @@
 	#include <avr/pgmspace.h>
 	#define PRIPSTR "%S"
 #else
-#if ! defined(ARDUINO) // This doesn't work on Arduino DUE
+#if ! defined(ARDUINO) && !defined RF24_LINUX // This doesn't work on Arduino DUE
 	typedef char const char;
 #else // Fill in pgm_read_byte that is used, but missing from DUE
 	#define pgm_read_byte(addr) (*(const unsigned char *)(addr))

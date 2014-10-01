@@ -18,7 +18,7 @@ CCFLAGS=-Ofast -mfpu=vfp -mfloat-abi=hard -march=armv6zk -mtune=arm1176jzf-s
 #CCFLAGS=
 
 # define all programs
-PROGRAMS = rx-test helloworld_rx helloworld_tx
+PROGRAMS = rx-test helloworld_rx helloworld_tx network_ping
 SOURCES = ${PROGRAMS:=.cpp}
 
 all: ${PROGRAMS}

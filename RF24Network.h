@@ -17,6 +17,11 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#if defined RF24_LINUX
+	#include <time.h>
+	#include <string.h>
+	#include <sys/time.h>
+#endif
 
 class RF24;
 
@@ -243,9 +248,6 @@ private:
 private:
   RF24& radio; /**< Underlying radio driver, provides link/physical layers */
 
-#if defined (DUAL_HEAD_RADIO)
-  RF24& radio1;
-#endif
   uint16_t node_address; /**< Logical node address of this unit, 1 .. UINT_MAX */
   const static int frame_size = 32; /**< How large is each frame over the air */
   uint8_t frame_buffer[frame_size]; /**< Space to put the frame that will be sent/received over the air */
@@ -255,6 +257,9 @@ private:
   uint16_t parent_node; /**< Our parent's node address */
   uint8_t parent_pipe; /**< The pipe our parent uses to listen to us */
   uint16_t node_mask; /**< The bits which contain signfificant node address information */
+  #if defined (DUAL_HEAD_RADIO)
+  RF24& radio1;
+  #endif
 
 };
 

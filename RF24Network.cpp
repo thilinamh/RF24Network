@@ -6,9 +6,27 @@
  version 2 as published by the Free Software Foundation.
  */
 
-#include "RF24Network_config.h"
-#include "RF24.h"
-#include "RF24Network.h"
+ #include "RF24Network_config.h"
+ 
+#if defined (RF24_LINUX)
+  #include <stdlib.h>
+  #include <stdio.h>
+  #include <errno.h>
+  #include <fcntl.h>
+  #include <sys/mman.h>
+  #include <string.h>
+  #include <sys/time.h>
+  #include <time.h>
+  #include <unistd.h>
+  #include <iostream>  
+  #include <algorithm>
+  #include "../RF24/RF24.h"
+  #include "RF24Network.h"
+#else 
+  
+  #include "RF24.h"
+  #include "RF24Network.h"
+#endif
 
 #if defined (ENABLE_SLEEP_MODE)
 	#include <avr/sleep.h>
@@ -106,21 +124,6 @@ void RF24Network::update(void)
 		// Relay it
  		write(header.to_node);
 	  }
-      // NOT NEEDED anymore.  Now all reading pipes are open to start.
-#if 0
-      // If this was for us, from one of our children, but on our listening
-      // pipe, it could mean that we are not listening to them.  If so, open up
-      // and listen to their talking pipe
-
-      if ( header.to_node == node_address && pipe_num == 0 && is_descendant(header.from_node) )
-      {
-	uint8_t pipe = pipe_to_descendant(header.from_node);
-	radio.openReadingPipe(pipe,pipe_address(node_address,pipe));
-
-	// Also need to open pipe 1 so the system can get the full 5-byte address of the pipe.
-	radio.openReadingPipe(1,pipe_address(node_address,1));
-      }
-#endif
     }
   }
 }
@@ -191,17 +194,24 @@ size_t RF24Network::read(RF24NetworkHeader& header,void* message, size_t maxlen)
     next_frame -= frame_size;
     uint8_t* frame = next_frame;
 
+#if defined RF24_LINUX
+	    // How much buffer size should we actually copy?
+    bufsize = std::min(maxlen,frame_size-sizeof(RF24NetworkHeader));
+
+    // Copy the next available frame from the queue into the provided buffer
+    memcpy(&header,frame,sizeof(RF24NetworkHeader));
+    memcpy(message,frame+sizeof(RF24NetworkHeader),bufsize);
+#else
     memcpy(&header,frame,sizeof(RF24NetworkHeader));
 
     if (maxlen > 0)
     {
       // How much buffer size should we actually copy?
       bufsize = min(maxlen,frame_size-sizeof(RF24NetworkHeader));
-
       // Copy the next available frame from the queue into the provided buffer
       memcpy(message,frame+sizeof(RF24NetworkHeader),bufsize);
     }
-
+#endif
     IF_SERIAL_DEBUG(printf_P(PSTR("%lu: NET Received %s\n\r"),millis(),header.toString()));
   }
 
@@ -218,7 +228,11 @@ bool RF24Network::write(RF24NetworkHeader& header,const void* message, size_t le
   // Build the full frame to send
   memcpy(frame_buffer,&header,sizeof(RF24NetworkHeader));
   if (len)
+    #if !defined (RF24_LINUX)
     memcpy(frame_buffer + sizeof(RF24NetworkHeader),message,min(frame_size-sizeof(RF24NetworkHeader),len));
+	#else
+	memcpy(frame_buffer + sizeof(RF24NetworkHeader),message,std::min(frame_size-sizeof(RF24NetworkHeader),len));
+	#endif
 
   IF_SERIAL_DEBUG(printf_P(PSTR("%lu: NET Sending %s\n\r"),millis(),header.toString()));
   if (len)
@@ -281,16 +295,6 @@ bool RF24Network::write(uint16_t to_node)
 
   ok = write_to_pipe( send_node, send_pipe );
 
-      // NOT NEEDED anymore.  Now all reading pipes are open to start.
-#if 0
-  // If we are talking on our talking pipe, it's possible that no one is listening.
-  // If this fails, try sending it on our parent's listening pipe.  That will wake
-  // it up, and next time it will listen to us.
-
-  if ( !ok && send_node == parent_node )
-    ok = write_to_pipe( parent_node, 0 );
-#endif
-
 #if !defined (DUAL_HEAD_RADIO)
   // Now, continue listening
   radio.startListening();
@@ -330,8 +334,11 @@ bool RF24Network::write_to_pipe( uint16_t node, uint8_t pipe )
 const char* RF24NetworkHeader::toString(void) const
 {
   static char buffer[45];
-  //snprintf_P(buffer,sizeof(buffer),PSTR("id %04x from 0%o to 0%o type %c"),id,from_node,to_node,type);
-  sprintf_P(buffer,PSTR("id %04x from 0%o to 0%o type %c"),id,from_node,to_node,type);
+  #if !defined(RF24_LINUX)
+	sprintf_P(buffer,PSTR("id %04x from 0%o to 0%o type %c"),id,from_node,to_node,type);
+  #else
+	sprintf(buffer,"id %04x from 0%o to 0%o type %c",id,from_node,to_node,type);
+  #endif
   return buffer;
 }
 
