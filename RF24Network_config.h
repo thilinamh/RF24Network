@@ -29,6 +29,8 @@
 //#define DUAL_HEAD_RADIO
 //#define ENABLE_SLEEP_MODE
 
+//define SERIAL_DEBUG_MINIMAL
+//#define SERIAL_DEBUG          //Enable minimal if enabling debuggin
 /*************************************/
 
 
@@ -59,7 +61,6 @@
 #endif
 
 
-  #undef SERIAL_DEBUG
   #ifdef SERIAL_DEBUG
 	#define IF_SERIAL_DEBUG(x) ({x;})
   #else

@@ -232,7 +232,15 @@ public:
 
   unsigned long txTimeout;
 
+  /**
+   * Failure counts. Each node will keep track of the number of
+   * failed transmissions, even routed payloads.
+   */
+  void failures(uint32_t *_fails, uint32_t *_ok);
+  
 private:
+  uint32_t nFails;
+  uint32_t nOK;
   void open_pipes(void);
   uint16_t find_node( uint16_t current_node, uint16_t target_node );
   bool write(uint16_t);

@@ -86,8 +86,16 @@ void RF24Network::begin(uint8_t _channel, uint16_t _node_address )
   int i = 6;
   while (i--)
     radio.openReadingPipe(i,pipe_address(_node_address,i));
+	
   radio.startListening();
+  
+}
 
+/******************************************************************/
+
+void RF24Network::failures(uint32_t *_fails, uint32_t *_ok){
+*_fails = nFails;
+*_ok = nOK;
 }
 
 /******************************************************************/
@@ -266,7 +274,7 @@ bool RF24Network::write(uint16_t to_node)
   // Where do we send this?  By default, to our parent
   uint16_t send_node = parent_node;
   // On which pipe
-  uint8_t send_pipe = parent_pipe;
+  uint8_t send_pipe = parent_pipe%5;
 
   // If the node is a direct child,
   if ( is_direct_child(to_node) )
@@ -275,7 +283,7 @@ bool RF24Network::write(uint16_t to_node)
     send_node = to_node;
 
     // To its listening pipe
-    send_pipe = 0;
+    send_pipe = 5;
   }
   // If the node is a child of a child
   // talk on our child's listening pipe,
@@ -283,7 +291,7 @@ bool RF24Network::write(uint16_t to_node)
   else if ( is_descendant(to_node) )
   {
     send_node = direct_child_route_to(to_node);
-    send_pipe = 0;
+    send_pipe = 5;
   }
 
   IF_SERIAL_DEBUG(printf_P(PSTR("%lu: MAC Sending to 0%o via 0%o on pipe %x\n\r"),millis(),to_node,send_node,send_pipe));
@@ -299,6 +307,9 @@ bool RF24Network::write(uint16_t to_node)
   // Now, continue listening
   radio.startListening();
 #endif
+  
+  nOK += ok;
+  if(!ok){nFails++;}
 
   return ok;
 }
@@ -442,7 +453,9 @@ bool is_valid_address( uint16_t node )
     if (digit < 1 || digit > 5)
     {
       result = false;
+	  #ifdef SERIAL_DEBUG_MINIMAL
       printf_P(PSTR("*** WARNING *** Invalid address 0%o\n\r"),node);
+	  #endif
       break;
     }
     node >>= 3;
@@ -455,7 +468,7 @@ bool is_valid_address( uint16_t node )
 
 uint64_t pipe_address( uint16_t node, uint8_t pipe )
 {
-  static uint8_t pipe_segment[] = { 0x3c, 0x5a, 0x69, 0x96, 0xa5, 0xc3 };
+  /*static uint8_t pipe_segment[] = { 0x3c, 0x5a, 0x69, 0x96, 0xa5, 0xc3 };
 
   uint64_t result;
   uint8_t* out = reinterpret_cast<uint8_t*>(&result);
@@ -472,7 +485,20 @@ uint64_t pipe_address( uint16_t node, uint8_t pipe )
     out[i+1] = w;
 
     shift -= 4;
+  }*/
+
+  static uint8_t address_translation[] = { 0xc3,0x3c,0x33,0xce,0x3e,0xe3,0xec };
+  uint64_t result = 0xCCCCCCCCCCLL;
+  uint8_t* out = reinterpret_cast<uint8_t*>(&result);
+  // Translate the address to use our optimally chosen radio address bytes
+  uint8_t count = 1; uint16_t dec = node;
+
+  while(dec){	
+    out[count]=address_translation[(dec % 8)];	// Convert our decimal values to octal, translate them to address bytes, and set our address
+    dec /= 8;	
+    count++;
   }
+  out[0] = address_translation[pipe];	// Set last byte by pipe number
 
   IF_SERIAL_DEBUG(uint32_t* top = reinterpret_cast<uint32_t*>(out+1);printf_P(PSTR("%lu: NET Pipe %i on node 0%o has address %lx%x\n\r"),millis(),pipe,node,*top,*out));
 
